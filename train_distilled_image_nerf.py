@@ -22,6 +22,7 @@ class NerfTrainer(object):
         self.state = state
         self.models = models
         state.distill_steps = 1
+        state.distill_epochs = 50
         self.num_data_steps = state.distill_steps  # how much data we have # Number of images we are trying to learn
         self.T = state.distill_steps * state.distill_epochs  # how many sc steps we run
         images, poses, render_poses, hwf, i_split = load_blender_data('./nerfpytorch/data/nerf_synthetic/lego', False, True, 8)
@@ -34,13 +35,12 @@ class NerfTrainer(object):
             num_workers=state.num_workers, pin_memory=True, shuffle=True
         )
 
-        self.sampled_poses = poses[np.random.choice(poses.shape[0], 10)]
+        self.sampled_poses = poses[np.random.choice(poses.shape[0], 5)]
         
         H, W, focal = hwf
         H, W = int(H), int(W)
         hwf = [H, W, focal]
         self.hwf = hwf
-        print("HWF ", self.hwf)
         
         K = np.array([
             [focal, 0, 0.5*W],
@@ -63,22 +63,22 @@ class NerfTrainer(object):
         # distill_label = distill_label.t().reshape(-1)  # [0, 0, ..., 1, 1, ...]
         
         for _ in range(self.num_data_steps):
-            self.labels.append(torch.from_numpy(self.sampled_poses).to(torch.device('cuda')))
+            self.labels.append(torch.from_numpy(self.sampled_poses).to(torch.device('cpu')))
         self.all_labels = torch.cat(self.labels)
 
         # data
         self.data = []
         for _ in range(self.num_data_steps):
             # TODO: Get blender data image size
-            distill_data = torch.randn(self.sampled_poses.shape[0], 4, self.hwf[0], self.hwf[1],
-                                       device=state.device, requires_grad=True)
+            distill_data = torch.randn(self.sampled_poses.shape[0], 3, self.hwf[0], self.hwf[1],
+                                       device=torch.device('cpu'), requires_grad=True)
             self.data.append(distill_data)
             self.params.append(distill_data)
 
         # lr
 
         # undo the softplus + threshold
-        raw_init_distill_lr = torch.tensor(state.distill_lr, device=state.device)
+        raw_init_distill_lr = torch.tensor(state.distill_lr, device=torch.device('cpu'))
         raw_init_distill_lr = raw_init_distill_lr.repeat(self.T, 1)
         self.raw_distill_lrs = raw_init_distill_lr.expm1_().log_().requires_grad_()
         self.params.append(self.raw_distill_lrs)
@@ -136,14 +136,13 @@ class NerfTrainer(object):
 
         for step_i, (data, label, lr) in enumerate(steps):
             
-            
+            label = label.to(torch.device('cuda'))
+            data = data.to(torch.device('cuda'))
             with torch.enable_grad():
                 # Render
                 rgbs, disps = render_poses_distil(label, self.hwf, self.K, 32, render_kwargs)
                 #
-                loss = img2mse(rgbs, data)
-                print(loss)
-            exit()
+                loss = img2mse(rgbs.permute(0, 3, 1, 2), data)
             gw, = torch.autograd.grad(loss, w, lr.squeeze(), create_graph=True)
 
             with torch.no_grad():

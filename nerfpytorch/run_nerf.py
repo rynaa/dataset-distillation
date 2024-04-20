@@ -149,12 +149,12 @@ def render_poses_distil(render_poses, hwf, K, chunk, render_kwargs, gt_imgs=None
 
     for i, c2w in enumerate(tqdm(render_poses)):
         rgb, disp, acc, _ = render(H, W, K, chunk=chunk, c2w=c2w[:3,:4], **render_kwargs)
-        if i==0:
-            print(rgb.shape, disp.shape)
-        rgbs.append(rgb.cpu().numpy())
-        disps.append(disp.cpu().numpy())
-    rgbs = np.stack(rgbs, 0)
-    disps = np.stack(disps, 0)
+        # if i==0:
+        #     print(rgb.shape, disp.shape)
+        rgbs.append(rgb)
+        disps.append(disp)
+    rgbs = torch.stack(rgbs, 0)
+    disps = torch.stack(disps, 0)
 
     return rgbs, disps
 
