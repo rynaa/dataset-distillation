@@ -6,6 +6,7 @@ import torch.nn as nn
 import torchvision
 from six import add_metaclass
 from torch.nn import init
+import math
 
 
 def init_weights(net, state):
@@ -22,7 +23,14 @@ def init_weights(net, state):
 
     def init_func(m):
         classname = m.__class__.__name__
-        if classname.startswith('Conv') or classname == 'Linear':
+        if classname == 'Linear':
+            init.kaiming_uniform_(m.weight, a=math.sqrt(5))
+            if getattr(m, 'bias', None) is not None:
+                fan_in, _ = init._calculate_fan_in_and_fan_out(m.weight)
+                bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
+                init.uniform_(m.bias, -bound, bound)
+
+        if classname.startswith('Conv'):
             if getattr(m, 'bias', None) is not None:
                 init.constant_(m.bias, 0.0)
             if getattr(m, 'weight', None) is not None:

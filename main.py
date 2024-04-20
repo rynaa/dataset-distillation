@@ -12,7 +12,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 import networks
-import train_distilled_image
+# import train_distilled_image
+import train_distilled_image_nerf
 import utils
 from base_options import options
 from basics import evaluate_models, evaluate_steps, format_stepwise_results
@@ -128,7 +129,7 @@ def main(state):
 
         if state.phase == 'train':
             logging.info('Train {} steps iterated for {} epochs'.format(state.distill_steps, state.distill_epochs))
-            steps = train_distilled_image.distill(state, state.models)
+            steps = train_distilled_image_nerf.distill(state, state.models)
             evaluate_steps(state, steps,
                            'distilled with {} steps and {} epochs'.format(state.distill_steps, state.distill_epochs),
                            test_all=True)
@@ -165,7 +166,7 @@ def main(state):
                 avg_images = None
 
                 def get_data_label(state):
-                    nonlocal avg_images
+                    global avg_images
                     if avg_images is None:
                         avg_images = utils.baselines.average_train(state)
                     return avg_images
